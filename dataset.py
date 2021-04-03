@@ -32,15 +32,11 @@ class SeqClsDataset(Dataset):
 
     def collate_fn(self, samples: List[Dict]) -> Dict:
         # TODO: implement collate_fn
-        mx_cols = max(len(instance["text"].split()) for instance in samples)
-
-        collated = {"tokens": [], "intent": [], "id": []}
-        for instance in samples:
-            words = instance["text"].split()
-            collated["tokens"].append(words.extend([Vocab.PAD] * (mx_cols - len(words))))
-            collated["intent"].append(instance["intent"])
-            collated["id"].append(instance["id"])
-        return collated
+        return {
+            "tokens": self.vocab.encode_batch([sample["text"].split for sample in samples]),
+            "intent_id": list(map(self.label2idx, [sample["intent"] for sample in samples])),
+            "id": [sample["id"] for sample in samples]
+        }
 
     def label2idx(self, label: str):
         return self.label_mapping[label]
