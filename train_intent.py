@@ -76,9 +76,9 @@ def main(args):
     criterion = criterion.to(args.device)
 
     epoch_pbar = trange(args.num_epoch, desc="Epoch")
+    best_stats = {'dev_acc': 0}
     for epoch in epoch_pbar:
         stats = {'train_acc': 0, 'train_loss': 0, 'dev_acc': 0, 'dev_loss': 0}
-        best_stats = {'dev_acc': 0}
 
         # TODO: Training loop - iterate over train dataloader and update model weights
         model.train()
