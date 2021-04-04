@@ -1,5 +1,7 @@
 venv/
 __pycache__/
 cache/
+ckpt/
+.vscode/
 glove.840B.300d.txt
 glove.840B.300d.zip
