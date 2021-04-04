@@ -160,7 +160,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
-    parser.add_argument("--net_type", type=str, choices=["lstm", "rnn"], default="lstm")
+    parser.add_argument("--net_type", type=str, choices=SeqClassifier.NET_TYPES.keys(), default="lstm")
     parser.add_argument("--hidden_size", type=int, default=512)
     parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--dropout", type=float, default=0.1)

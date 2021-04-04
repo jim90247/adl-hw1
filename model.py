@@ -6,6 +6,8 @@ from torch.nn import Embedding
 
 
 class SeqClassifier(torch.nn.Module):
+    NET_TYPES = {'rnn': nn.RNN, 'lstm': nn.LSTM, 'gru': nn.GRU}
+
     def __init__(self,
                  embeddings: torch.tensor,
                  padding_idx: int,
@@ -18,23 +20,21 @@ class SeqClassifier(torch.nn.Module):
         super(SeqClassifier, self).__init__()
         self.embed = Embedding.from_pretrained(embeddings, freeze=False, padding_idx=padding_idx)
         # TODO: model architecture
-        self.rnn = nn.RNN(embeddings.size(1),
-                          hidden_size,
-                          num_layers,
-                          batch_first=True,
-                          bidirectional=bidirectional,
-                          dropout=dropout)
-        self.lstm = nn.LSTM(embeddings.size(1),
-                            hidden_size,
-                            num_layers,
-                            batch_first=True,
-                            bidirectional=bidirectional,
-                            dropout=dropout)
 
+        self.net_type: str = net_type.lower()
+
+        if self.NET_TYPES.get(self.net_type) is None:
+            raise ValueError(f"Invalid network type: {net_type}")
+
+        self.rnn = self.NET_TYPES[net_type](embeddings.size(1),
+                                            hidden_size,
+                                            num_layers,
+                                            batch_first=True,
+                                            bidirectional=bidirectional,
+                                            dropout=dropout)
         self.fc = nn.Linear(hidden_size * 2 if bidirectional else hidden_size, num_class)
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
-        self.net_type: str = net_type
 
     @property
     def encoder_output_size(self) -> int:
@@ -45,14 +45,12 @@ class SeqClassifier(torch.nn.Module):
         # TODO: implement model forward
         embedded = self.embed(batch)
 
-        if self.net_type.lower() == 'rnn':
-            # output shape (seq_len, batch, num_directions * hidden_size)
+        if self.net_type == 'lstm':
+            output, (hidden, cell) = self.rnn(embedded)
+        else:
+            # output shape (batch, seq_len, num_directions * hidden_size) as batch_first is provided
             # hidden shape (num_layers * num_directions, batch, hidden_size)
             output, hidden = self.rnn(embedded)
-        elif self.net_type.lower() == 'lstm':
-            output, (hidden, cell) = self.lstm(embedded)
-        else:
-            raise ValueError(f"Invalid network type: {self.net_type}")
 
         last_layer_hidden = torch.cat(
             (hidden[-2, :, :], hidden[-1, :, :]), dim=1) if self.bidirectional else hidden[-1, :, :]
