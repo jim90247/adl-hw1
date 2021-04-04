@@ -1,9 +1,11 @@
 import argparse
 import json
+import os
 import pickle
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
 from typing import Dict
+import pprint
 
 import torch
 import torch.nn as nn
@@ -62,11 +64,12 @@ def main(args):
     # A 2d float tensor, where embedding[i] is the embedding of i-th token
     embeddings = torch.load(args.cache_dir / "embeddings.pt")
     # TODO: init model and move model to target device(cpu / gpu)
-    model = SeqClassifier(embeddings, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
+    model = SeqClassifier(embeddings, vocab.pad_id, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
                           len(intent2idx))
 
     # TODO: init optimizer
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    scheduler = optim.lr_scheduler.StepLR(optimizer, args.step, 0.1)
     criterion = nn.CrossEntropyLoss()
 
     model = model.to(args.device)
@@ -75,6 +78,7 @@ def main(args):
     epoch_pbar = trange(args.num_epoch, desc="Epoch")
     for epoch in epoch_pbar:
         stats = {'train_acc': 0, 'train_loss': 0, 'dev_acc': 0, 'dev_loss': 0}
+        best_stats = {'dev_acc': 0}
 
         # TODO: Training loop - iterate over train dataloader and update model weights
         model.train()
@@ -109,11 +113,24 @@ def main(args):
 
                 stats['dev_acc'] += acc.item()
                 stats['dev_loss'] += loss.item()
+
             stats['dev_acc'] /= len(data_loaders[DEV])
             stats['dev_loss'] /= len(data_loaders[DEV])
 
+        # save checkpoint if better than best one
+        if stats['dev_acc'] > best_stats['dev_acc']:
+            best_stats = stats.copy()
+            best_stats['epoch'] = epoch
+            torch.save({
+                'model_state_dict': model.state_dict(),
+                **best_stats
+            }, os.path.join(args.ckpt_dir, "intent.ckpt"))
+
+        scheduler.step()
+
         epoch_pbar.set_postfix(stats)
 
+    pprint.pprint(best_stats)
     # TODO: Inference on test set
 
 
@@ -160,6 +177,7 @@ def parse_args() -> Namespace:
 
     # optimizer
     parser.add_argument("--lr", type=float, default=1e-3)
+    parser.add_argument("--step", type=int, default=30)
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=128)

@@ -9,6 +9,7 @@ class SeqClassifier(torch.nn.Module):
     def __init__(
         self,
         embeddings: torch.tensor,
+        padding_idx: int,
         hidden_size: int,
         num_layers: int,
         dropout: float,
@@ -16,7 +17,7 @@ class SeqClassifier(torch.nn.Module):
         num_class: int,
     ) -> None:
         super(SeqClassifier, self).__init__()
-        self.embed = Embedding.from_pretrained(embeddings, freeze=False)
+        self.embed = Embedding.from_pretrained(embeddings, freeze=False, padding_idx=padding_idx)
         # TODO: model architecture
         self.rnn = nn.RNN(embeddings.size(1),
                           hidden_size,
