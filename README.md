@@ -28,3 +28,4 @@ python train_intent.py
 - [Kaggle: Slot Tagging](https://www.kaggle.com/c/ntu-adl-hw1-slot-tag-spring-2021)
 - [Github: chakki-works/seqeval](https://github.com/chakki-works/seqeval)
 - [Github: bentrevett/pytorch-sentiment-analysis](https://github.com/bentrevett/pytorch-sentiment-analysis)
+- [Named Entity Recognition Tagging](https://cs230.stanford.edu/blog/namedentity/)
