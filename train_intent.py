@@ -68,7 +68,7 @@ def main(args):
                           len(intent2idx), args.net_type)
 
     # TODO: init optimizer
-    optimizer = optim.SGD(model.parameters(), lr=args.lr)
+    optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, args.step, 0.1)
     criterion = nn.CrossEntropyLoss()
 
@@ -160,10 +160,10 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
-    parser.add_argument("--net_type", type=str, choices=SeqClassifier.NET_TYPES.keys(), default="lstm")
+    parser.add_argument("--net_type", type=str, choices=SeqClassifier.NET_TYPES.keys(), default="gru")
     parser.add_argument("--hidden_size", type=int, default=512)
-    parser.add_argument("--num_layers", type=int, default=2)
-    parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--num_layers", type=int, default=3)
+    parser.add_argument("--dropout", type=float, default=0.5)
 
     def str2bool(v):
         if isinstance(v, bool):
@@ -179,13 +179,13 @@ def parse_args() -> Namespace:
 
     # optimizer
     parser.add_argument("--lr", type=float, default=1e-3)
-    parser.add_argument("--step", type=int, default=30)
+    parser.add_argument("--step", type=int, default=100)
 
     # data loader
     parser.add_argument("--batch_size", type=int, default=128)
 
     # training
-    parser.add_argument("--device", type=torch.device, help="cpu, cuda, cuda:0, cuda:1", default="cpu")
+    parser.add_argument("--device", type=torch.device, help="cpu, cuda, cuda:0, cuda:1", default="cuda")
     parser.add_argument("--num_epoch", type=int, default=100)
 
     args = parser.parse_args()
