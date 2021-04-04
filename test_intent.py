@@ -28,18 +28,12 @@ def main(args):
 
     embeddings = torch.load(args.cache_dir / "embeddings.pt")
 
-    model = SeqClassifier(
-        embeddings,
-        vocab.pad_id,
-        args.hidden_size,
-        args.num_layers,
-        args.dropout,
-        args.bidirectional,
-        dataset.num_classes,
-    )
+    ckpt = torch.load(args.ckpt_path)
+
+    model = SeqClassifier(embeddings, vocab.pad_id, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
+                          dataset.num_classes, ckpt['net_type'])
     model.eval()
 
-    ckpt = torch.load(args.ckpt_path)
     # load weights into model
     model.load_state_dict(ckpt['model_state_dict'])
 

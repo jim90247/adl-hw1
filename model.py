@@ -6,16 +6,15 @@ from torch.nn import Embedding
 
 
 class SeqClassifier(torch.nn.Module):
-    def __init__(
-        self,
-        embeddings: torch.tensor,
-        padding_idx: int,
-        hidden_size: int,
-        num_layers: int,
-        dropout: float,
-        bidirectional: bool,
-        num_class: int,
-    ) -> None:
+    def __init__(self,
+                 embeddings: torch.tensor,
+                 padding_idx: int,
+                 hidden_size: int,
+                 num_layers: int,
+                 dropout: float,
+                 bidirectional: bool,
+                 num_class: int,
+                 net_type: str = 'lstm') -> None:
         super(SeqClassifier, self).__init__()
         self.embed = Embedding.from_pretrained(embeddings, freeze=False, padding_idx=padding_idx)
         # TODO: model architecture
@@ -25,10 +24,17 @@ class SeqClassifier(torch.nn.Module):
                           batch_first=True,
                           bidirectional=bidirectional,
                           dropout=dropout)
+        self.lstm = nn.LSTM(embeddings.size(1),
+                            hidden_size,
+                            num_layers,
+                            batch_first=True,
+                            bidirectional=bidirectional,
+                            dropout=dropout)
 
         self.fc = nn.Linear(hidden_size * 2 if bidirectional else hidden_size, num_class)
         self.dropout = nn.Dropout(dropout)
         self.bidirectional = bidirectional
+        self.net_type: str = net_type
 
     @property
     def encoder_output_size(self) -> int:
@@ -39,9 +45,14 @@ class SeqClassifier(torch.nn.Module):
         # TODO: implement model forward
         embedded = self.embed(batch)
 
-        # output shape (seq_len, batch, num_directions * hidden_size)
-        # hidden shape (num_layers * num_directions, batch, hidden_size)
-        output, hidden = self.rnn(embedded)
+        if self.net_type.lower() == 'rnn':
+            # output shape (seq_len, batch, num_directions * hidden_size)
+            # hidden shape (num_layers * num_directions, batch, hidden_size)
+            output, hidden = self.rnn(embedded)
+        elif self.net_type.lower() == 'lstm':
+            output, (hidden, cell) = self.lstm(embedded)
+        else:
+            raise ValueError(f"Invalid network type: {self.net_type}")
 
         last_layer_hidden = torch.cat(
             (hidden[-2, :, :], hidden[-1, :, :]), dim=1) if self.bidirectional else hidden[-1, :, :]

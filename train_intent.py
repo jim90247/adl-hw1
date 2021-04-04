@@ -65,7 +65,7 @@ def main(args):
     embeddings = torch.load(args.cache_dir / "embeddings.pt")
     # TODO: init model and move model to target device(cpu / gpu)
     model = SeqClassifier(embeddings, vocab.pad_id, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
-                          len(intent2idx))
+                          len(intent2idx), args.net_type)
 
     # TODO: init optimizer
     optimizer = optim.SGD(model.parameters(), lr=args.lr)
@@ -120,8 +120,9 @@ def main(args):
         # save checkpoint if better than best one
         if stats['dev_acc'] > best_stats['dev_acc']:
             best_stats = stats.copy()
-            best_stats['epoch'] = epoch
+            best_stats['epoch'] = epoch + 1
             torch.save({
+                'net_type': args.net_type,
                 'model_state_dict': model.state_dict(),
                 **best_stats
             }, os.path.join(args.ckpt_dir, "intent.ckpt"))
@@ -159,6 +160,7 @@ def parse_args() -> Namespace:
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
+    parser.add_argument("--net_type", type=str, choices=["lstm", "rnn"], default="lstm")
     parser.add_argument("--hidden_size", type=int, default=512)
     parser.add_argument("--num_layers", type=int, default=2)
     parser.add_argument("--dropout", type=float, default=0.1)
