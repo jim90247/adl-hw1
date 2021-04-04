@@ -27,3 +27,4 @@ python train_intent.py
 - [Kaggle: Intent Classification](https://www.kaggle.com/c/ntu-adl-hw1-intent-cls-spring-2021)
 - [Kaggle: Slot Tagging](https://www.kaggle.com/c/ntu-adl-hw1-slot-tag-spring-2021)
 - [Github: chakki-works/seqeval](https://github.com/chakki-works/seqeval)
+- [Github: bentrevett/pytorch-sentiment-analysis](https://github.com/bentrevett/pytorch-sentiment-analysis)
