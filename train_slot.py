@@ -84,7 +84,7 @@ def main(args):
     # TODO: init optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, args.step, 0.1)
-    criterion = nn.CrossEntropyLoss(ignore_index=SeqLblDataset.UNK_TAG)
+    criterion = nn.CrossEntropyLoss(ignore_index=SeqLblDataset.PAD_TAG)
 
     model = model.to(args.device)
     criterion = criterion.to(args.device)
@@ -106,7 +106,7 @@ def main(args):
             tags = tags.view(-1)  # flatten tags to become batch*max_seq_len
             loss = criterion(out, tags)
             correct_batch, correct_token, total_token = calculate_accuracy(out, tags, local_batch_size,
-                                                                           SeqLblDataset.UNK_TAG)
+                                                                           SeqLblDataset.PAD_TAG)
 
             stats['train_correct_token'] += correct_token
             stats['train_total_token'] += total_token
@@ -131,7 +131,7 @@ def main(args):
                 tags = tags.view(-1)
                 loss = criterion(out, tags)
                 correct_batch, correct_token, total_token = calculate_accuracy(out, tags, local_batch_size,
-                                                                               SeqLblDataset.UNK_TAG)
+                                                                               SeqLblDataset.PAD_TAG)
 
                 stats['dev_correct_token'] += correct_token
                 stats['dev_total_token'] += total_token

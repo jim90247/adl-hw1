@@ -72,7 +72,7 @@ class SeqClsDataset(SeqDataset):
 
 
 class SeqLblDataset(SeqDataset):
-    UNK_TAG = -1
+    PAD_TAG = -1
 
     def __init__(self, data: List[Dict], vocab: Vocab, tag_mapping: Dict[str, int], max_len: int):
         """Create an instance of SeqLblDataset
@@ -90,8 +90,10 @@ class SeqLblDataset(SeqDataset):
 
         def transform_tags(tags: List[str], pad_len) -> List[int]:
             tag_ids = list(map(self.label2idx, tags))
-            tag_ids.extend([self.UNK_TAG] * (pad_len - len(tags)))
+            tag_ids.extend([self.PAD_TAG] * (pad_len - len(tags)))
             return tag_ids
 
-        padded_tags = [transform_tags(sample["tags"], len(tokens[0])) for sample in samples]
+        padded_tags = [
+            transform_tags(sample["tags"], len(tokens[0])) for sample in samples if sample.get("tags") is not None
+        ]
         return {"tokens": tokens, "tags": padded_tags, "id": [sample["id"] for sample in samples]}
