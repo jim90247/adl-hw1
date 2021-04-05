@@ -13,8 +13,7 @@ import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import trange
 
-from dataset import SeqClsDataset
-from model import SeqClassifier
+from train_intent import categorical_accuracy as token_accuracy
 from utils import Vocab
 
 TRAIN = "train"
@@ -25,16 +24,6 @@ SEED = 1234
 
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
-
-
-def categorical_accuracy(preds, y):
-    """
-    Returns accuracy per batch, i.e. if you get 8/10 right, this returns 0.8, NOT 8
-    """
-    top_pred = preds.argmax(1, keepdim=True)
-    correct = top_pred.eq(y.view_as(top_pred)).sum()
-    acc = correct.float() / y.shape[0]
-    return acc
 
 
 def main(args):
@@ -89,7 +78,7 @@ def main(args):
 
             out = model(tokens).squeeze(1)
             loss = criterion(out, intents)
-            acc = categorical_accuracy(out, intents)
+            acc = token_accuracy(out, intents, SeqLblDataset.UNK_TAG)
 
             stats['train_acc'] += acc.item()
             stats['train_loss'] += loss.item()
@@ -109,7 +98,7 @@ def main(args):
 
                 out = model(tokens)
                 loss = criterion(out, intents)
-                acc = categorical_accuracy(out, intents)
+                acc = token_accuracy(out, intents)
 
                 stats['dev_acc'] += acc.item()
                 stats['dev_loss'] += loss.item()

@@ -27,13 +27,14 @@ torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
 
 
-def categorical_accuracy(preds, y):
+def categorical_accuracy(preds, y, ignore_index: int = -1):
     """
     Returns accuracy per batch, i.e. if you get 8/10 right, this returns 0.8, NOT 8
     """
     top_pred = preds.argmax(1, keepdim=True)
-    correct = top_pred.eq(y.view_as(top_pred)).sum()
-    acc = correct.float() / y.shape[0]
+    mask = y.view_as(top_pred).ne(ignore_index)
+    correct = torch.masked_select(top_pred.eq(y.view_as(top_pred)), mask)
+    acc = correct.sum().float() / correct.shape[0]
     return acc
 
 
