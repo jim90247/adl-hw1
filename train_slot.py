@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Dict, Tuple
 import pprint
 
+import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -84,7 +85,18 @@ def main(args):
     # TODO: init optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, args.step, 0.1)
-    criterion = nn.CrossEntropyLoss(ignore_index=SeqLblDataset.PAD_TAG)
+
+    if args.weighted_loss:
+        weights = np.zeros(len(tag2idx), dtype=np.float32)
+        for sample in datasets[TRAIN]:
+            for tag in sample['tags']:
+                weights[tag2idx[tag]] += 1
+        weights = 1 / weights
+        weights /= min(weights)
+        weights = np.sqrt(weights)
+        criterion = nn.CrossEntropyLoss(weight=torch.Tensor(weights), ignore_index=SeqLblDataset.PAD_TAG)
+    else:
+        criterion = nn.CrossEntropyLoss(ignore_index=SeqLblDataset.PAD_TAG)
 
     model = model.to(args.device)
     criterion = criterion.to(args.device)
@@ -211,6 +223,7 @@ def parse_args() -> Namespace:
     # training
     parser.add_argument("--device", type=torch.device, help="cpu, cuda, cuda:0, cuda:1", default="cuda")
     parser.add_argument("--num_epoch", type=int, default=100)
+    parser.add_argument("--weighted_loss", action='store_true', default=False)
 
     args = parser.parse_args()
     return args
