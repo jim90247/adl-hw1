@@ -5,7 +5,7 @@ from torch.utils.data import Dataset
 from utils import Vocab
 
 
-class SeqClsDataset(Dataset):
+class SeqDataset(Dataset):
     def __init__(
         self,
         data: List[Dict],
@@ -13,7 +13,7 @@ class SeqClsDataset(Dataset):
         label_mapping: Dict[str, int],
         max_len: int,
     ):
-        """Create an instance of SeqClsDataset
+        """Create an instance of SeqDataset
 
         Args:
             data (List[Dict]): json dataset (consists of input and its label)
@@ -40,6 +40,28 @@ class SeqClsDataset(Dataset):
 
     def collate_fn(self, samples: List[Dict]) -> Dict:
         # TODO: implement collate_fn
+        raise NotImplementedError
+
+    def label2idx(self, label: str):
+        return self.label_mapping[label]
+
+    def idx2label(self, idx: int):
+        return self._idx2label[idx]
+
+
+class SeqClsDataset(SeqDataset):
+    def __init__(self, data: List[Dict], vocab: Vocab, intent_mapping: Dict[str, int], max_len: int):
+        """Create an instance of SeqClsDataset
+
+        Args:
+            data (List[Dict]): json dataset (consists of text and its intent)
+            vocab (Vocab): the mapping of each word (string) to an unique integer
+            intent_mapping (Dict[str, int]): the mapping of intent (string) to intent id
+            max_len (int): max length of a padded sentence created by collate_fn
+        """
+        super().__init__(data, vocab, intent_mapping, max_len)
+
+    def collate_fn(self, samples: List[Dict]) -> Dict:
         return {
             "tokens":
             self.vocab.encode_batch([sample["text"].split() for sample in samples]),
@@ -48,8 +70,22 @@ class SeqClsDataset(Dataset):
             "id": [sample["id"] for sample in samples]
         }
 
-    def label2idx(self, label: str):
-        return self.label_mapping[label]
 
-    def idx2label(self, idx: int):
-        return self._idx2label[idx]
+class SeqLblDataset(SeqDataset):
+    def __init__(self, data: List[Dict], vocab: Vocab, tag_mapping: Dict[str, int], max_len: int):
+        """Create an instance of SeqLblDataset
+
+        Args:
+            data (List[Dict]): json dataset (consists of tokens and their tags)
+            vocab (Vocab): the mapping of each word (string) to an unique integer
+            tag_mapping (Dict[str, int]): the mapping of tag (string) to tag id
+            max_len (int): max length of a padded sentence created by collate_fn
+        """
+        super().__init__(data, vocab, tag_mapping, max_len)
+
+    def collate_fn(self, samples: List[Dict]) -> Dict:
+        return {
+            "tokens": self.vocab.encode_batch([sample["tokens"]] for sample in samples),
+            "tags": [list(map(self.label2idx, sample["tags"])) for sample in samples],
+            "id": [sample["id"] for sample in samples]
+        }
