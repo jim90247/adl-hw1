@@ -10,9 +10,12 @@ import pprint
 import torch
 import torch.nn as nn
 import torch.optim as optim
+from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.utils.data import DataLoader
 from tqdm import trange
 
+from dataset import SeqLblDataset
+from model import SeqLabeller
 from train_intent import categorical_accuracy as token_accuracy
 from utils import Vocab
 
@@ -30,14 +33,14 @@ def main(args):
     with open(args.cache_dir / "vocab.pkl", "rb") as f:
         vocab: Vocab = pickle.load(f)
 
-    intent_idx_path = args.cache_dir / "intent2idx.json"
-    intent2idx: Dict[str, int] = json.loads(intent_idx_path.read_text())
+    tag_idx_path = args.cache_dir / "tag2idx.json"
+    tag2idx: Dict[str, int] = json.loads(tag_idx_path.read_text())
 
     data_paths = {split: args.data_dir / f"{split}.json" for split in SPLITS}
-    # json file with "text", "intent" and "id"
+    # json file with "tokens", "tags" and "id"
     data = {split: json.loads(path.read_text()) for split, path in data_paths.items()}
-    datasets: Dict[str, SeqClsDataset] = {
-        split: SeqClsDataset(split_data, vocab, intent2idx, args.max_len)
+    datasets: Dict[str, SeqLblDataset] = {
+        split: SeqLblDataset(split_data, vocab, tag2idx, args.max_len)
         for split, split_data in data.items()
     }
     # TODO: crecate DataLoader for train / dev datasets
@@ -53,13 +56,13 @@ def main(args):
     # A 2d float tensor, where embedding[i] is the embedding of i-th token
     embeddings = torch.load(args.cache_dir / "embeddings.pt")
     # TODO: init model and move model to target device(cpu / gpu)
-    model = SeqClassifier(embeddings, vocab.pad_id, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
-                          len(intent2idx), args.net_type)
+    model = SeqLabeller(embeddings, vocab.pad_id, args.hidden_size, args.num_layers, args.dropout, args.bidirectional,
+                        len(tag2idx), args.net_type)
 
     # TODO: init optimizer
     optimizer = optim.Adam(model.parameters(), lr=args.lr)
     scheduler = optim.lr_scheduler.StepLR(optimizer, args.step, 0.1)
-    criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(ignore_index=SeqLblDataset.UNK_TAG)
 
     model = model.to(args.device)
     criterion = criterion.to(args.device)
@@ -74,11 +77,12 @@ def main(args):
         for batch in data_loaders[TRAIN]:
             optimizer.zero_grad()
             tokens = torch.LongTensor(batch['tokens']).to(args.device)
-            intents = torch.LongTensor(batch['intent']).to(args.device)
+            tags = torch.LongTensor(batch['tags']).to(args.device)
 
-            out = model(tokens).squeeze(1)
-            loss = criterion(out, intents)
-            acc = token_accuracy(out, intents, SeqLblDataset.UNK_TAG)
+            out = model(tokens)
+            tags = tags.view(-1) # flatten tags to become batch*max_seq_len
+            loss = criterion(out, tags)
+            acc = token_accuracy(out, tags, SeqLblDataset.UNK_TAG)
 
             stats['train_acc'] += acc.item()
             stats['train_loss'] += loss.item()
@@ -94,11 +98,12 @@ def main(args):
         with torch.no_grad():
             for batch in data_loaders[DEV]:
                 tokens = torch.LongTensor(batch['tokens']).to(args.device)
-                intents = torch.LongTensor(batch['intent']).to(args.device)
+                tags = torch.LongTensor(batch['tags']).to(args.device)
 
                 out = model(tokens)
-                loss = criterion(out, intents)
-                acc = token_accuracy(out, intents)
+                tags = tags.view(-1)
+                loss = criterion(out, tags)
+                acc = token_accuracy(out, tags)
 
                 stats['dev_acc'] += acc.item()
                 stats['dev_loss'] += loss.item()
@@ -114,7 +119,7 @@ def main(args):
                 'net_type': args.net_type,
                 'model_state_dict': model.state_dict(),
                 **best_stats
-            }, os.path.join(args.ckpt_dir, "intent.ckpt"))
+            }, os.path.join(args.ckpt_dir, "slot.ckpt"))
 
         scheduler.step()
 
@@ -130,26 +135,26 @@ def parse_args() -> Namespace:
         "--data_dir",
         type=Path,
         help="Directory to the dataset.",
-        default="./data/intent/",
+        default="./data/slot/",
     )
     parser.add_argument(
         "--cache_dir",
         type=Path,
         help="Directory to the preprocessed caches.",
-        default="./cache/intent/",
+        default="./cache/slot/",
     )
     parser.add_argument(
         "--ckpt_dir",
         type=Path,
         help="Directory to save the model file.",
-        default="./ckpt/intent/",
+        default="./ckpt/slot/",
     )
 
     # data
     parser.add_argument("--max_len", type=int, default=128)
 
     # model
-    parser.add_argument("--net_type", type=str, choices=SeqClassifier.NET_TYPES.keys(), default="gru")
+    parser.add_argument("--net_type", type=str, choices=SeqLabeller.NET_TYPES.keys(), default="gru")
     parser.add_argument("--hidden_size", type=int, default=512)
     parser.add_argument("--num_layers", type=int, default=3)
     parser.add_argument("--dropout", type=float, default=0.5)

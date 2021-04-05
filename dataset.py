@@ -86,11 +86,12 @@ class SeqLblDataset(SeqDataset):
         super().__init__(data, vocab, tag_mapping, max_len)
 
     def collate_fn(self, samples: List[Dict]) -> Dict:
-        tokens = self.vocab.encode_batch([sample["tokens"]] for sample in samples)
+        tokens = self.vocab.encode_batch(sample["tokens"] for sample in samples)
 
         def transform_tags(tags: List[str], pad_len) -> List[int]:
             tag_ids = list(map(self.label2idx, tags))
-            return tag_ids.extend([self.UNK_TAG] * (pad_len - len(tags)))
+            tag_ids.extend([self.UNK_TAG] * (pad_len - len(tags)))
+            return tag_ids
 
         padded_tags = [transform_tags(sample["tags"], len(tokens[0])) for sample in samples]
         return {"tokens": tokens, "tags": padded_tags, "id": [sample["id"] for sample in samples]}

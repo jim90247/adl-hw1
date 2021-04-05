@@ -88,9 +88,9 @@ class SeqLabeller(SeqModel):
         # output shape (batch, seq_len, num_directions * hidden_size) as batch_first is provided
         output, _ = self.rnn(embedded)
 
-        output = output.view(-1, output.shape[2])
+        # print(output.shape)
+        output = output.reshape(-1, output.shape[2])
 
         dropped = self.dropout(output)
 
-        # Using `log_softmax` here enables simpler implementation of custom loss function
-        return log_softmax(self.fc(dropped))
+        return self.fc(dropped)
