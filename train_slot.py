@@ -14,6 +14,8 @@ import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
 from tqdm import trange
+from seqeval.metrics import classification_report
+from seqeval.scheme import IOB2
 
 from dataset import SeqLblDataset
 from model import SeqLabeller
@@ -168,6 +170,29 @@ def main(args):
         epoch_pbar.set_postfix({k: stats[k] for k in ['train_acc', 'train_loss', 'dev_acc', 'dev_loss']})
 
     pprint.pprint(best_stats)
+
+    # Load the best model to generate seqeval report
+    ckpt = torch.load(args.ckpt_dir / "slot.ckpt")
+    model.load_state_dict(ckpt['model_state_dict'])
+
+    predictions = []
+    true_tags = []
+    with torch.no_grad():
+        for batch in data_loaders[DEV]:
+            tokens = torch.LongTensor(batch['tokens']).to(args.device)
+            tags = torch.LongTensor(batch['tags']).to(args.device)
+            local_batch_size = len(batch['id'])
+
+            out = model(tokens)
+            preds = out.argmax(1)
+            preds = preds.view_as(tags).tolist()  # batch_size x seq_len
+            for pred, tag in zip(preds, batch['tags']):
+                num_valid_token = sum(t != SeqLblDataset.PAD_TAG for t in tag)  # keep non-padding tags only
+                predictions.append([datasets[DEV].idx2label(idx) for idx in pred[:num_valid_token]])
+                true_tags.append([datasets[DEV].idx2label(idx) for idx in tag[:num_valid_token]])
+
+    print(classification_report(true_tags, predictions, scheme=IOB2))
+
     # TODO: Inference on test set
 
 
