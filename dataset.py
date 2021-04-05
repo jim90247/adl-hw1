@@ -72,6 +72,8 @@ class SeqClsDataset(SeqDataset):
 
 
 class SeqLblDataset(SeqDataset):
+    UNK_TAG = -1
+
     def __init__(self, data: List[Dict], vocab: Vocab, tag_mapping: Dict[str, int], max_len: int):
         """Create an instance of SeqLblDataset
 
@@ -84,8 +86,11 @@ class SeqLblDataset(SeqDataset):
         super().__init__(data, vocab, tag_mapping, max_len)
 
     def collate_fn(self, samples: List[Dict]) -> Dict:
-        return {
-            "tokens": self.vocab.encode_batch([sample["tokens"]] for sample in samples),
-            "tags": [list(map(self.label2idx, sample["tags"])) for sample in samples],
-            "id": [sample["id"] for sample in samples]
-        }
+        tokens = self.vocab.encode_batch([sample["tokens"]] for sample in samples)
+
+        def transform_tags(tags: List[str], pad_len) -> List[int]:
+            tag_ids = list(map(self.label2idx, tags))
+            return tag_ids.extend([self.UNK_TAG] * (pad_len - len(tags)))
+
+        padded_tags = [transform_tags(sample["tags"], len(tokens[0])) for sample in samples]
+        return {"tokens": tokens, "tags": padded_tags, "id": [sample["id"] for sample in samples]}
