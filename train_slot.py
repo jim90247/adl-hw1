@@ -1,22 +1,21 @@
 import argparse
+from collections import defaultdict
 import json
 import os
 import pickle
 from argparse import ArgumentParser, Namespace
 from pathlib import Path
-from typing import Dict
+from typing import Dict, Tuple
 import pprint
 
 import torch
 import torch.nn as nn
 import torch.optim as optim
-from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence
 from torch.utils.data import DataLoader
 from tqdm import trange
 
 from dataset import SeqLblDataset
 from model import SeqLabeller
-from train_intent import categorical_accuracy as token_accuracy
 from utils import Vocab
 
 TRAIN = "train"
@@ -27,6 +26,29 @@ SEED = 1234
 
 torch.manual_seed(SEED)
 torch.backends.cudnn.deterministic = True
+
+
+def calculate_accuracy(preds, targets, batch_size, ignore_index: int = -1) -> Tuple[int, int, int]:
+    """
+    Returns the number of correct batches, correct tokens and total valid tokens.
+    """
+    top_preds = preds.argmax(1).view(batch_size, -1)
+    targets = targets.view(batch_size, -1)
+
+    correct_batch = 0
+    correct_token = 0
+    total_token = 0
+
+    for pred, target in zip(top_preds, targets):
+        m = target.ne(ignore_index)
+        pred, target = torch.masked_select(pred, m), torch.masked_select(target, m)
+        correct = pred.eq(target)
+
+        correct_token += correct.sum().item()
+        total_token += correct.shape[0]
+        if correct.sum().item() == correct.shape[0]:
+            correct_batch += 1
+    return correct_batch, correct_token, total_token
 
 
 def main(args):
@@ -70,7 +92,7 @@ def main(args):
     epoch_pbar = trange(args.num_epoch, desc="Epoch")
     best_stats = {'dev_acc': 0}
     for epoch in epoch_pbar:
-        stats = {'train_acc': 0, 'train_loss': 0, 'dev_acc': 0, 'dev_loss': 0}
+        stats = defaultdict(lambda: 0)  # all statistics are default to 0
 
         # TODO: Training loop - iterate over train dataloader and update model weights
         model.train()
@@ -78,20 +100,24 @@ def main(args):
             optimizer.zero_grad()
             tokens = torch.LongTensor(batch['tokens']).to(args.device)
             tags = torch.LongTensor(batch['tags']).to(args.device)
+            local_batch_size = len(batch['id'])
 
             out = model(tokens)
-            tags = tags.view(-1) # flatten tags to become batch*max_seq_len
+            tags = tags.view(-1)  # flatten tags to become batch*max_seq_len
             loss = criterion(out, tags)
-            acc = token_accuracy(out, tags, SeqLblDataset.UNK_TAG)
+            correct_batch, correct_token, total_token = calculate_accuracy(out, tags, local_batch_size,
+                                                                           SeqLblDataset.UNK_TAG)
 
-            stats['train_acc'] += acc.item()
-            stats['train_loss'] += loss.item()
+            stats['train_correct_token'] += correct_token
+            stats['train_total_token'] += total_token
+            stats['train_correct_batch'] += correct_batch
+            stats['train_loss'] += loss.item() * local_batch_size
 
             loss.backward()
             optimizer.step()
 
-        stats['train_acc'] /= len(data_loaders[TRAIN])
-        stats['train_loss'] /= len(data_loaders[TRAIN])
+        stats['train_acc'] = stats['train_correct_batch'] / len(datasets[TRAIN])
+        stats['train_loss'] /= len(datasets[TRAIN])
 
         # TODO: Evaluation loop - calculate accuracy and save model weights
         model.eval()
@@ -99,21 +125,25 @@ def main(args):
             for batch in data_loaders[DEV]:
                 tokens = torch.LongTensor(batch['tokens']).to(args.device)
                 tags = torch.LongTensor(batch['tags']).to(args.device)
+                local_batch_size = len(batch['id'])
 
                 out = model(tokens)
                 tags = tags.view(-1)
                 loss = criterion(out, tags)
-                acc = token_accuracy(out, tags)
+                correct_batch, correct_token, total_token = calculate_accuracy(out, tags, local_batch_size,
+                                                                               SeqLblDataset.UNK_TAG)
 
-                stats['dev_acc'] += acc.item()
-                stats['dev_loss'] += loss.item()
+                stats['dev_correct_token'] += correct_token
+                stats['dev_total_token'] += total_token
+                stats['dev_correct_batch'] += correct_batch
+                stats['dev_loss'] += loss.item() * local_batch_size
 
-            stats['dev_acc'] /= len(data_loaders[DEV])
-            stats['dev_loss'] /= len(data_loaders[DEV])
+            stats['dev_acc'] = stats['dev_correct_batch'] / len(datasets[DEV])
+            stats['dev_loss'] /= len(datasets[DEV])
 
         # save checkpoint if better than best one
         if stats['dev_acc'] > best_stats['dev_acc']:
-            best_stats = stats.copy()
+            best_stats = dict(stats)
             best_stats['epoch'] = epoch + 1
             torch.save({
                 'net_type': args.net_type,
@@ -123,7 +153,7 @@ def main(args):
 
         scheduler.step()
 
-        epoch_pbar.set_postfix(stats)
+        epoch_pbar.set_postfix({k: stats[k] for k in ['train_acc', 'train_loss', 'dev_acc', 'dev_loss']})
 
     pprint.pprint(best_stats)
     # TODO: Inference on test set
