@@ -65,9 +65,7 @@ class SeqClassifier(SeqModel):
         last_layer_hidden = torch.cat(
             (hidden[-2, :, :], hidden[-1, :, :]), dim=1) if self.bidirectional else hidden[-1, :, :]
 
-        dropped = self.dropout(last_layer_hidden)
-
-        return self.fc(dropped)
+        return self.fc(last_layer_hidden)
 
 
 class SeqLabeller(SeqModel):
@@ -88,7 +86,6 @@ class SeqLabeller(SeqModel):
         # output shape (batch, seq_len, num_directions * hidden_size) as batch_first is provided
         output, _ = self.rnn(embedded)
 
-        # print(output.shape)
         output = output.reshape(-1, output.shape[2])
 
         dropped = self.dropout(output)

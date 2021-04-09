@@ -133,6 +133,8 @@ def main(args):
         epoch_pbar.set_postfix(stats)
 
     pprint.pprint(best_stats)
+    print("Checkpoint saved to :", args.ckpt_dir / "intent.ckpt")
+
     # TODO: Inference on test set
 
 
