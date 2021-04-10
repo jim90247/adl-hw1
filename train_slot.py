@@ -104,7 +104,7 @@ def main(args):
     criterion = criterion.to(args.device)
 
     epoch_pbar = trange(args.num_epoch, desc="Epoch")
-    best_stats = {'dev_acc': 0}
+    best_stats = {'dev_correct_token': 0}
     for epoch in epoch_pbar:
         stats = defaultdict(lambda: 0)  # all statistics are default to 0
 
@@ -156,7 +156,7 @@ def main(args):
             stats['dev_loss'] /= len(datasets[DEV])
 
         # save checkpoint if better than best one
-        if stats['dev_acc'] > best_stats['dev_acc']:
+        if stats['dev_correct_token'] > best_stats['dev_correct_token']:
             best_stats = dict(stats)
             best_stats['epoch'] = epoch + 1
             torch.save({
