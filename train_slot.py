@@ -191,7 +191,7 @@ def main(args):
                 predictions.append([datasets[DEV].idx2label(idx) for idx in pred[:num_valid_token]])
                 true_tags.append([datasets[DEV].idx2label(idx) for idx in tag[:num_valid_token]])
 
-    print(classification_report(true_tags, predictions, scheme=IOB2))
+    print(classification_report(true_tags, predictions, scheme=IOB2, mode='strict'))
     print("Checkpoint saved to :", args.ckpt_dir / "slot.ckpt")
 
     # TODO: Inference on test set
